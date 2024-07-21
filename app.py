@@ -10,9 +10,9 @@ import streamlit as st
 from streamlit_option_menu import option_menu
 
 # Loading the saved models
-diabetes_model = pickle.load(open("C:/Users/Dell/OneDrive/Desktop/Multiple Disease Prediction/Diabetes/Diabetes Prediction.sav", 'rb'))
-parkinson_model = pickle.load(open("C:/Users/Dell/OneDrive/Desktop/Multiple Disease Prediction/Parkinson's Disease/parkinsons_model.sav", 'rb'))
-heart_disease_model = pickle.load(open("C:/Users/Dell/OneDrive/Desktop/Multiple Disease Prediction/Heart Disease/heart_disease_model.sav", 'rb'))
+diabetes_model = pickle.load(open("Diabetes/Diabetes Prediction.sav", 'rb'))
+parkinson_model = pickle.load(open("Parkinson's Disease/parkinsons_model.sav", 'rb'))
+heart_disease_model = pickle.load(open("Heart Disease/heart_disease_model.sav", 'rb'))
 
 # Creating the sidebar for navigation
 with st.sidebar:
@@ -23,7 +23,7 @@ with st.sidebar:
 
 # Displaying the appropriate page title
 if selected == 'Diabetes Prediction':
-    st.title('Diabetes Prediction using SVM')
+    st.title('Diabetes Prediction using ML')
     
     # Columns for input fields
     col1, col2, col3 = st.columns(3)
@@ -58,7 +58,7 @@ if selected == 'Diabetes Prediction':
     st.success(diab_diagnosis)
 
 elif selected == 'Heart Disease Prediction':
-    st.title('Heart Disease Prediction using Logistic Regression')
+    st.title('Heart Disease Prediction using ML')
     
     col1, col2, col3 = st.columns(3)
     
@@ -105,7 +105,7 @@ elif selected == 'Heart Disease Prediction':
     st.success(heart_diagnosis)
 
 elif selected == "Parkinson's Prediction":
-    st.title("Parkinson's Disease Prediction using SVM")
+    st.title("Parkinson's Disease Prediction using ML")
     
     col1, col2, col3, col4, col5 = st.columns(5)
     
@@ -168,6 +168,7 @@ elif selected == "Parkinson's Prediction":
         else:
             parkinsons_diagnosis = "The person does not have Parkinson's disease"
     st.success(parkinsons_diagnosis)
+
 
 
     
