@@ -4,7 +4,6 @@ import pandas as pd
 import pickle
 import seaborn as sns
 import matplotlib.pyplot as plt
-import joblib
 from streamlit_option_menu import option_menu  # Import the option_menu function
 
 # Set page configuration
