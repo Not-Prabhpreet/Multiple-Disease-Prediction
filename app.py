@@ -27,7 +27,7 @@ def main():
 
     # Diabetes Prediction Page
     if selected == 'Diabetes Prediction':
-        st.title('Diabetes Prediction using ML')
+        st.title('Diabetes Prediction using SVM')
 
         # Columns for input fields
         col1, col2, col3 = st.columns(3)
@@ -64,7 +64,7 @@ def main():
 
     # Heart Disease Prediction Page
     elif selected == 'Heart Disease Prediction':
-        st.title('Heart Disease Prediction using ML')
+        st.title('Heart Disease Prediction using Logistic Regression')
 
         col1, col2, col3 = st.columns(3)
 
@@ -112,7 +112,7 @@ def main():
 
     # Parkinson's Prediction Page
     elif selected == "Parkinson's Prediction":
-        st.title("Parkinson's Disease Prediction using ML")
+        st.title("Parkinson's Disease Prediction using SVM")
 
         col1, col2, col3, col4, col5 = st.columns(5)
 
