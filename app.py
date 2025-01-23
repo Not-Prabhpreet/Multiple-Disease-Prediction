@@ -2,12 +2,32 @@ import os
 import streamlit as st
 import pandas as pd
 import pickle
-import seaborn as sns
-import matplotlib.pyplot as plt
-from streamlit_option_menu import option_menu  # Import the option_menu function
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import numpy as np
+from streamlit_option_menu import option_menu
 
 # Set page configuration
 st.set_page_config(page_title="Health Data Analysis and Prediction", layout="wide", page_icon="📊")
+
+# Custom CSS
+st.markdown("""
+    <style>
+    .main {
+        padding: 0rem 1rem;
+    }
+    .stPlotlyChart {
+        width: 100%;
+    }
+    .metric-container {
+        background-color: #f0f2f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin: 0.5rem 0;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Load the models
 diabetes_model = pickle.load(open("Diabetes/Diabetes Prediction.sav", 'rb'))
@@ -17,15 +37,15 @@ heart_disease_model = pickle.load(open("Heart Disease/heart_disease_model.sav", 
 # Function for the main logic of the app
 def main():
     # Sidebar for navigation
+   # Sidebar for navigation
     with st.sidebar:
         selected = option_menu(
-            'Multiple Disease Prediction and Data Visualization System',  # Title
-            ['Diabetes Prediction', 'Heart Disease Prediction', "Parkinson's Prediction", "Data Visualizer"],  # Options
-            icons=['activity', 'heart', 'person', 'bar-chart'],  # Icons for each option
-            default_index=0  # Default selected option
+            'Multiple Disease Prediction and Data Visualization System',
+            ['Data Visualizer', 'Diabetes Prediction', 'Heart Disease Prediction', "Parkinson's Prediction"],
+            icons=['bar-chart', 'activity', 'heart', 'person'],
+            default_index=0
         )
-
-    # Diabetes Prediction Page
+        # Diabetes Prediction Page
     if selected == 'Diabetes Prediction':
         st.title('Diabetes Prediction using ML')
 
@@ -176,93 +196,272 @@ def main():
             else:
                 parkinsons_diagnosis = "The person does not have Parkinson's disease"
         st.success(parkinsons_diagnosis)
-
+        
     # Data Visualizer Page
     elif selected == "Data Visualizer":
         st.title("📊 Data Visualizer")
 
         # Getting the working directory
         working_dir = os.path.dirname(os.path.abspath(__file__))
-
-        # Specify the folder where your CSV files are located
         folder_path = os.path.join(working_dir, 'datasets')
-
-        # List the files present in the "datasets" folder
         files_list = [f for f in os.listdir(folder_path) if f.endswith('.csv')]
 
-        # Dropdown to select a file
+        # File selection with additional info
         selected_file = st.selectbox("Select a file", files_list, index=None)
 
         if selected_file:
-            # Get the complete path of the selected file
+            # Cache the data loading
+            @st.cache_data
+            def load_data(filepath):
+                return pd.read_csv(filepath)
+            
+            # Read the CSV
             file_path = os.path.join(folder_path, selected_file)
-            # Reading the CSV as a pandas dataframe
-            df = pd.read_csv(file_path)
+            df = load_data(file_path)
             columns = df.columns.tolist()
 
-            # Display important statistics
-            st.write("### Important Statistics")
-            st.write(df.describe())
+            # Dataset Overview Metrics
+            st.header("📊 Dataset Overview")
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Total Records", f"{len(df):,}")
+            with col2:
+                st.metric("Total Features", len(df.columns))
+            with col3:
+                missing_values = df.isna().sum().sum()
+                st.metric("Missing Values", f"{missing_values:,}")
+            with col4:
+                memory_usage = df.memory_usage().sum() / 1024**2
+                st.metric("Memory Usage", f"{memory_usage:.2f} MB")
 
-            # Data preview
-            st.write("### Data Preview")
-            st.write(df.head())
+            # Create tabs for different analysis views
+           # Modified tab section with enhanced features
+            tab1, tab2, tab3, tab4 = st.tabs([
+                "📈 Data Overview",
+                "📊 Statistical Analysis",
+                "🔍 Feature Relations",
+                "🎨 Custom Visualizations"
+            ])
 
-            # Select columns for plotting
-            st.write("### Select Columns for Plotting")
-            x_axis = st.selectbox("Select the X-axis", options=["None"] + columns, index=0)
-            y_axis = st.selectbox("Select the Y-axis", options=["None"] + columns, index=0)
+            with tab1:
+                st.subheader("Quick Data Preview")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.dataframe(df.head(), use_container_width=True)
+                with col2:
+                    # Enhanced data info with better formatting
+                    dtype_df = pd.DataFrame({
+                        'Column': df.dtypes.index,
+                        'Type': df.dtypes.values,
+                        'Non-Null': df.count().values,
+                        'Missing': df.isna().sum().values,
+                        'Unique Values': [df[col].nunique() for col in df.columns]
+                    })
+                    st.dataframe(dtype_df, use_container_width=True)
 
-            # Filter data
-            st.write("### Filter Data")
-            filter_column = st.selectbox("Filter Column", options=["None"] + columns, index=0)
-            filter_value = st.text_input("Filter Value")
+            with tab2:
+                st.subheader("Distribution Analysis")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Numeric Analysis with enhanced visualizations
+                    numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
+                    if len(numeric_cols) > 0:
+                        selected_num_col = st.selectbox("Select Numeric Feature", numeric_cols)
+                        
+                        # Distribution plot with both histogram and box plot
+                        fig = px.histogram(df, x=selected_num_col, 
+                                         marginal="box",  # adds boxplot at margin
+                                         color_discrete_sequence=['#1f77b4'],
+                                         title=f'Distribution of {selected_num_col}')
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Categorical Analysis with pie charts
+                    cat_cols = df.select_dtypes(include=['object']).columns
+                    if len(cat_cols) > 0:
+                        selected_cat_col = st.selectbox("Select Categorical Feature", cat_cols)
+                        
+                        # Enhanced pie chart with better styling
+                        value_counts = df[selected_cat_col].value_counts()
+                        fig = px.pie(values=value_counts.values,
+                                   names=value_counts.index,
+                                   title=f'Distribution of {selected_cat_col}',
+                                   hole=0.4)  # Makes it a donut chart
+                        fig.update_traces(textposition='outside', textinfo='percent+label')
+                        st.plotly_chart(fig, use_container_width=True)
 
-            if filter_column != "None" and filter_value:
-                df = df[df[filter_column] == filter_value]
+            with tab3:
+                st.subheader("Feature Relationships")
+                
+                # Enhanced correlation heatmap
+                numeric_df = df.select_dtypes(include=['float64', 'int64'])
+                if not numeric_df.empty and len(numeric_df.columns) > 1:
+                    fig = px.imshow(numeric_df.corr(),
+                                  title="Feature Correlation Heatmap",
+                                  color_continuous_scale='RdBu_r',
+                                  aspect='auto')
+                    fig.update_traces(text=numeric_df.corr().round(2), texttemplate='%{text}')
+                    st.plotly_chart(fig, use_container_width=True)
 
-            # Select plot type
-            st.write("### Select Plot Type")
-            plot_list = ["Line Plot", "Bar Chart", "Scatter Plot", "Distribution Plot", "Count Plot"]
-            selected_plot = st.selectbox("Select a Plot", options=plot_list, index=0)
+                    # Add feature comparison
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        x_feature = st.selectbox("Select X-axis feature", numeric_df.columns)
+                    with col2:
+                        y_feature = st.selectbox("Select Y-axis feature", numeric_df.columns)
+                    
+                    fig = px.scatter(df, x=x_feature, y=y_feature,
+                                   trendline="ols",
+                                   title=f'Relationship between {x_feature} and {y_feature}')
+                    st.plotly_chart(fig, use_container_width=True)
 
-            # Plot customizations
-            st.write("### Plot Customizations")
-            color = st.color_picker("Pick a Color", "#69b3a2")
-            line_style = st.selectbox("Line Style", options=["-", "--", "-.", ":"], index=0)
+            with tab4:
+                st.subheader("Custom Visualizations")
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    plot_type = st.selectbox(
+                        "Select Plot Type",
+                        ["Scatter Plot", "Line Plot", "Bar Plot", "Box Plot", 
+                         "Violin Plot", "3D Scatter Plot", "Pie Chart", 
+                         "Bubble Plot", "Area Plot", "Density Heatmap"]
+                    )
+                
+                # Axis selection based on plot type
+                if plot_type != "Pie Chart":
+                    col_x, col_y = st.columns(2)
+                    with col_x:
+                        x_axis = st.selectbox("Select X-axis", columns)
+                    with col_y:
+                        y_axis = st.selectbox("Select Y-axis", columns)
+                    
+                    # Add z-axis for 3D plot
+                    if plot_type == "3D Scatter Plot":
+                        z_axis = st.selectbox("Select Z-axis", columns)
+                else:
+                    values_col = st.selectbox("Select Values Column", 
+                                            df.select_dtypes(include=['float64', 'int64']).columns)
+                    names_col = st.selectbox("Select Names Column", 
+                                           df.select_dtypes(include=['object']).columns)
 
-            # Generate the plot based on user selection
-            if st.button("Generate Plot"):
-                fig, ax = plt.subplots(figsize=(8, 5))
+                # Advanced styling options
+                st.write("### Styling Options")
+                style_col1, style_col2 = st.columns(2)
+                
+                with style_col1:
+                    # Color selection
+                    color_method = st.radio("Color Selection Method", 
+                                          ["Color Picker", "RGB Values", "Column Color"])
+                    
+                    if color_method == "Color Picker":
+                        color = st.color_picker("Pick a Color", "#1f77b4")
+                    elif color_method == "RGB Values":
+                        r = st.slider("R", 0, 255, 31)
+                        g = st.slider("G", 0, 255, 119)
+                        b = st.slider("B", 0, 255, 180)
+                        color = f"rgb({r},{g},{b})"
+                    else:
+                        color_column = st.selectbox("Color by column", ["None"] + list(df.columns))
+                        color = color_column if color_column != "None" else None
 
-                if x_axis != "None" and y_axis != "None":
-                    if selected_plot == "Line Plot":
-                        sns.lineplot(x=df[x_axis], y=df[y_axis], ax=ax, color=color, linestyle=line_style)
-                    elif selected_plot == "Bar Chart":
-                        sns.barplot(x=df[x_axis], y=df[y_axis], ax=ax, color=color)
-                    elif selected_plot == "Scatter Plot":
-                        sns.scatterplot(x=df[x_axis], y=df[y_axis], ax=ax, color=color)
-                    elif selected_plot == "Distribution Plot":
-                        sns.histplot(df[x_axis], kde=True, ax=ax, color=color)
-                    elif selected_plot == "Count Plot":
-                        sns.countplot(x=df[x_axis], ax=ax, color=color)
-                elif selected_plot == "Distribution Plot" and x_axis != "None":
-                    sns.histplot(df[x_axis], kde=True, ax=ax, color=color)
-                elif selected_plot == "Count Plot" and x_axis != "None":
-                    sns.countplot(x=df[x_axis], ax=ax, color=color)
+                with style_col2:
+                    # Additional styling options
+                    if plot_type in ["Line Plot", "Scatter Plot"]:
+                        marker_size = st.slider("Marker Size", 1, 20, 8)
+                        opacity = st.slider("Opacity", 0.0, 1.0, 0.7)
+                    
+                    if plot_type == "Bar Plot":
+                        orientation = st.selectbox("Orientation", ["vertical", "horizontal"])
+                        barmode = st.selectbox("Bar Mode", ["group", "stack"])
+                    
+                    if plot_type in ["Pie Chart"]:
+                        donut = st.checkbox("Donut Chart", value=False)
+                        if donut:
+                            hole_size = st.slider("Hole Size", 0.1, 0.9, 0.5)
 
-                ax.tick_params(axis='x', labelsize=10)
-                ax.tick_params(axis='y', labelsize=10)
-                plt.title(f'{selected_plot} of {y_axis} vs {x_axis}', fontsize=12)
-                plt.xlabel(x_axis, fontsize=10)
-                plt.ylabel(y_axis, fontsize=10)
+                # Generate plot button
+                if st.button("Generate Plot"):
+                    try:
+                        if plot_type == "Scatter Plot":
+                            fig = px.scatter(df, x=x_axis, y=y_axis,
+                                           color=color if color_method == "Column Color" else None,
+                                           color_discrete_sequence=[color] if color_method != "Column Color" else None,
+                                           opacity=opacity,
+                                           title=f"Scatter Plot: {y_axis} vs {x_axis}")
+                            fig.update_traces(marker=dict(size=marker_size))
 
-                st.pyplot(fig)
+                        elif plot_type == "Line Plot":
+                            fig = px.line(df, x=x_axis, y=y_axis,
+                                        color=color if color_method == "Column Color" else None,
+                                        color_discrete_sequence=[color] if color_method != "Column Color" else None,
+                                        title=f"Line Plot: {y_axis} vs {x_axis}")
+                            fig.update_traces(line=dict(width=marker_size))
 
+                        elif plot_type == "Bar Plot":
+                            fig = px.bar(df, x=x_axis if orientation == "vertical" else y_axis,
+                                       y=y_axis if orientation == "vertical" else x_axis,
+                                       color=color if color_method == "Column Color" else None,
+                                       color_discrete_sequence=[color] if color_method != "Column Color" else None,
+                                       barmode=barmode,
+                                       orientation="v" if orientation == "vertical" else "h",
+                                       title=f"Bar Plot: {y_axis} vs {x_axis}")
+
+                        elif plot_type == "Box Plot":
+                            fig = px.box(df, x=x_axis, y=y_axis,
+                                       color=color if color_method == "Column Color" else None,
+                                       color_discrete_sequence=[color] if color_method != "Column Color" else None,
+                                       title=f"Box Plot: {y_axis} by {x_axis}")
+
+                        elif plot_type == "Violin Plot":
+                            fig = px.violin(df, x=x_axis, y=y_axis,
+                                          color=color if color_method == "Column Color" else None,
+                                          color_discrete_sequence=[color] if color_method != "Column Color" else None,
+                                          title=f"Violin Plot: {y_axis} by {x_axis}")
+
+                        elif plot_type == "3D Scatter Plot":
+                            fig = px.scatter_3d(df, x=x_axis, y=y_axis, z=z_axis,
+                                              color=color if color_method == "Column Color" else None,
+                                              color_discrete_sequence=[color] if color_method != "Column Color" else None,
+                                              title=f"3D Scatter Plot")
+
+                        elif plot_type == "Pie Chart":
+                            fig = px.pie(df, values=values_col, names=names_col,
+                                       color_discrete_sequence=[color] if color_method != "Column Color" else None,
+                                       hole=hole_size if donut else None,
+                                       title=f"Pie Chart of {values_col} by {names_col}")
+
+                        elif plot_type == "Bubble Plot":
+                            size_col = st.selectbox("Select Size Column", 
+                                                  df.select_dtypes(include=['float64', 'int64']).columns)
+                            fig = px.scatter(df, x=x_axis, y=y_axis,
+                                           size=size_col,
+                                           color=color if color_method == "Column Color" else None,
+                                           color_discrete_sequence=[color] if color_method != "Column Color" else None,
+                                           title=f"Bubble Plot: {y_axis} vs {x_axis}")
+
+                        elif plot_type == "Density Heatmap":
+                            fig = px.density_heatmap(df, x=x_axis, y=y_axis,
+                                                   color_continuous_scale='RdBu_r',
+                                                   title=f"Density Heatmap: {y_axis} vs {x_axis}")
+
+                        # Update layout for all plots
+                        fig.update_layout(
+                            plot_bgcolor='white',
+                            title_x=0.5,
+                            width=800,
+                            height=600
+                        )
+                        
+                        # Display the plot
+                        st.plotly_chart(fig, use_container_width=True)
+
+                    except Exception as e:
+                        st.error(f"Error generating plot: {str(e)}")
+                        st.error("Please check if your selected columns and plot type are compatible.")
 if __name__ == '__main__':
     main()
-
-
-
 
     
